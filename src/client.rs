@@ -18,7 +18,7 @@ use self::reqwest::StatusCode;
 use serde_json::{Map as SerdeMap, Value};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-
+use std::env;
 
 pub struct KongApiClient<'t> {
     pub base_url: &'t str,
@@ -26,12 +26,16 @@ pub struct KongApiClient<'t> {
 }
 
 impl<'t> KongApiClient<'t> {
+
+
     pub fn build_with_url(kong_admin_url: &'t str) -> KongApiClient<'t> {
         return KongApiClient { base_url: kong_admin_url, client: reqwest::Client::new() };
     }
 
     pub fn get_node_info(&self) -> Result<KongInfo, reqwest::Error> {
         return self.client.get(&format!("{}/", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send()
             .and_then(|mut res| res.json::<KongInfo>());
     }
@@ -43,6 +47,8 @@ impl<'t> KongApiClient<'t> {
             Some(offset) => format!("{}/services?offset={}", self.base_url, offset)
         };
         return self.client.get(&list_srv_url)
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send()
             .and_then(|mut res| res.json::<ServiceList>());
     }
@@ -66,12 +72,14 @@ impl<'t> KongApiClient<'t> {
 
     pub fn delete_service(&self, service_id_or_name: &str) {
         match self.client.delete(&format!("{}/services/{}", self.base_url, service_id_or_name))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send() {
             Err(why) => error!("delete_service: {} using id={}", why, service_id_or_name),
             Ok(resp) => {
-                if resp.status() == StatusCode::NoContent {
+                if resp.status() == StatusCode::NO_CONTENT {
                     info!("service {} has removed!", service_id_or_name)
-                } else if resp.status() == StatusCode::NotFound {
+                } else if resp.status() == StatusCode::NOT_FOUND {
                     debug!("service {} not found, skip!", service_id_or_name)
                 } else {
                     // TODO add body msg
@@ -84,6 +92,8 @@ impl<'t> KongApiClient<'t> {
     pub fn add_service(&self, payload: &ServiceInfo) -> Option<String> {
         let s_name = payload.get("name").unwrap();
         return match self.client.post(&format!("{}/services", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(payload)
             .send() {
             Err(why) => {
@@ -91,7 +101,7 @@ impl<'t> KongApiClient<'t> {
                 None
             }
             Ok(mut resp) => {
-                if resp.status() == StatusCode::Created {
+                if resp.status() == StatusCode::CREATED {
                     info!("Service {} has created/updated!", s_name);
                     resp.json::<AddServiceResp>()
                         .map(|obj| obj.id)
@@ -111,6 +121,8 @@ impl<'t> KongApiClient<'t> {
             Some(offset) => format!("{}/routes?offset={}", self.base_url, offset)
         };
         return self.client.get(&list_route_url)
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send()
             .and_then(|mut res| res.json::<RouteList>());
     }
@@ -134,12 +146,15 @@ impl<'t> KongApiClient<'t> {
 
     pub fn delete_route(&self, route_id: &str) {
         match self.client.delete(&format!("{}/routes/{}", self.base_url, route_id))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
+            .header("X-Pepito", "juanito")
             .send() {
             Err(why) => error!("delete_route: {} using id={}", why, route_id),
             Ok(resp) => {
-                if resp.status() == StatusCode::NoContent {
+                if resp.status() == StatusCode::NO_CONTENT {
                     info!("route {} has removed!", route_id)
-                } else if resp.status() == StatusCode::NotFound {
+                } else if resp.status() == StatusCode::NOT_FOUND {
                     debug!("route {} not found, skip!", route_id)
                 } else {
                     // TODO add body msg
@@ -158,6 +173,8 @@ impl<'t> KongApiClient<'t> {
         };
 
         return self.client.get(&list_plugins_url)
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send()
             .and_then(|mut res| res.json::<PluginList>());
     }
@@ -181,12 +198,14 @@ impl<'t> KongApiClient<'t> {
 
     pub fn delete_plugin_by_id(&self, plugin_id: &str) {
         match self.client.delete(&format!("{}/plugins/{}", self.base_url, plugin_id))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send() {
             Err(why) => error!("delete_plugin_by_id: {} using id={}", why, plugin_id),
             Ok(resp) => {
-                if resp.status() == StatusCode::NoContent {
+                if resp.status() == StatusCode::NO_CONTENT {
                     info!("plugin {} has removed!", plugin_id)
-                } else if resp.status() == StatusCode::NotFound {
+                } else if resp.status() == StatusCode::NOT_FOUND {
                     debug!("plugin {} not found, skip!", plugin_id)
                 } else {
                     error!("delete_plugin_by_id: {} using id={}", resp.status(), plugin_id)
@@ -204,6 +223,8 @@ impl<'t> KongApiClient<'t> {
         route_cfg.insert("service".to_string(), Value::Object(silly_obj_map));
 
         match self.client.post(&format!("{}/routes", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(&route_cfg)
             .send() {
             Err(why) => {
@@ -211,7 +232,7 @@ impl<'t> KongApiClient<'t> {
                 return None;
             }
             Ok(mut resp) => {
-                if resp.status() == StatusCode::Created {
+                if resp.status() == StatusCode::CREATED {
                     info!("Route {} has created/updated!", route_info.name);
                     return resp.json::<AddRouteResp>()
                         .map(|obj| obj.id)
@@ -226,6 +247,8 @@ impl<'t> KongApiClient<'t> {
 
     pub fn get_api_counts(&self) -> Result<i32, reqwest::Error> {
         return self.client.get(&format!("{}/apis", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send()
             .and_then(|mut res| res.json::<ListApiResp>())
             .map(|list_api_info| list_api_info.total);
@@ -233,12 +256,14 @@ impl<'t> KongApiClient<'t> {
 
     pub fn delete_api(&self, api_name: &str) {
         match self.client.delete(&format!("{}/apis/{}", self.base_url, api_name))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .send() {
             Err(why) => error!("delete_api: {}", why),
             Ok(resp) => {
-                if resp.status() == StatusCode::NoContent {
+                if resp.status() == StatusCode::NO_CONTENT {
                     info!("API {} has removed!", api_name)
-                } else if resp.status() == StatusCode::NotFound {
+                } else if resp.status() == StatusCode::NOT_FOUND {
                     debug!("API {} not found, skip!", api_name)
                 } else {
                     warn!("delete_api: {}", resp.status())
@@ -249,11 +274,13 @@ impl<'t> KongApiClient<'t> {
 
     pub fn upsert_api(&self, api_name: &str, payload: &ApiInfo) {
         match self.client.put(&format!("{}/apis", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(payload)
             .send() {
             Err(why) => error!("upsert_api: {}", why),
             Ok(mut resp) => {
-                if resp.status() == StatusCode::Created {
+                if resp.status() == StatusCode::CREATED {
                     info!("API {} has created/updated!", api_name)
                 } else {
                     warn!("upsert_api: {} {}", resp.status(), resp.text().unwrap())
@@ -269,6 +296,8 @@ impl<'t> KongApiClient<'t> {
         });
 
         return match self.client.post(&format!("{}/consumers", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(&payload)
             .send() {
             Err(why) => {
@@ -276,11 +305,13 @@ impl<'t> KongApiClient<'t> {
                 String::from("error_id")
             }
             Ok(mut resp) => {
-                return if resp.status() == StatusCode::Created {
+                return if resp.status() == StatusCode::CREATED {
                     info!("upsert_consumer: custom_id={} has created!", custom_id);
                     resp.json::<ConsumerDO>().unwrap().id
-                } else if resp.status() == StatusCode::Conflict {
+                } else if resp.status() == StatusCode::CONFLICT {
                     self.client.get(&format!("{}/consumers/{}", self.base_url, custom_id))
+                        .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+                        .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
                         .send()
                         .and_then(|mut res| res.json::<ConsumerDO>())
                         .map(|c_info| c_info.id).unwrap()
@@ -295,15 +326,17 @@ impl<'t> KongApiClient<'t> {
     pub fn add_consumer(&self, payload: &BTreeMap<String, String>) {
         let username = payload.get("username").unwrap();
         return match self.client.post(&format!("{}/consumers", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(&payload)
             .send() {
             Err(why) => {
                 error!("upsert_consumer: {}", why);
             }
             Ok(resp) => {
-                return if resp.status() == StatusCode::Created {
+                return if resp.status() == StatusCode::CREATED {
                     info!("upsert_consumer: username={} has created!", username);
-                } else if resp.status() == StatusCode::Conflict {
+                } else if resp.status() == StatusCode::CONFLICT {
                     info!("upsert_consumer: username={} has existed! skip..", username);
                 } else {
                     error!("upsert_consumer: unexpected status returned {}", resp.status());
@@ -320,11 +353,13 @@ impl<'t> KongApiClient<'t> {
         }
 
         match self.client.post(&format!("{}/apis/{}/plugins", self.base_url, api_name))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(&json_payload)
             .send() {
             Err(why) => error!("apply_plugin_to_one: {}", why),
             Ok(resp) => {
-                if resp.status() == StatusCode::Created || resp.status() == StatusCode::Conflict {
+                if resp.status() == StatusCode::CREATED || resp.status() == StatusCode::CONFLICT {
                     info!("succeed applying plugin {} to API {}", plugin_type, api_name)
                 } else {
                     error!("_apply_plugin_to_one: {}", resp.status())
@@ -341,11 +376,13 @@ impl<'t> KongApiClient<'t> {
         }
 
         match self.client.post(&format!("{}/plugins", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(&json_payload)
             .send() {
             Err(why) => error!("apply_plugin_to_all: {}", why),
             Ok(resp) => {
-                if resp.status() == StatusCode::Created || resp.status() == StatusCode::Conflict {
+                if resp.status() == StatusCode::CREATED || resp.status() == StatusCode::CONFLICT {
                     info!("succeed applying plugin {} to all API", plugin_type)
                 } else {
                     error!("_apply_plugin_to_all: {}", resp.status())
@@ -398,12 +435,14 @@ impl<'t> KongApiClient<'t> {
 
     pub fn _apply_plugin(&self, target_desc: &str, payload: &HashMap<String, Value>) {
         match self.client.post(&format!("{}/plugins", self.base_url))
+            .header("Authorization", format!("Basic {}", env::var("USER_PASSWORD").unwrap()))
+            .header("Kong-Admin-Token", env::var("USER_TOKEN").unwrap())
             .json(payload)
             .send() {
             Err(why) => error!("apply_plugin_to_one: {}", why),
             Ok(resp) => {
-                if resp.status() == StatusCode::Created
-                    || resp.status() == StatusCode::Conflict {
+                if resp.status() == StatusCode::CREATED
+                    || resp.status() == StatusCode::CONFLICT {
                     info!("{}", target_desc)
                 } else {
                     error!("_apply_plugin: error {}", resp.status())
